@@ -241,7 +241,6 @@ class development_layer(nn.Module):
         # N, C = input_path.shape
 
         N, T, C = input_path.shape
-
         if self.include_initial:
             input_path = torch.cat(
                 [torch.zeros((N, 1, C)).to(input_path.device), input_path], dim=1)
@@ -253,64 +252,61 @@ class development_layer(nn.Module):
 
         dX = input_path[:, 1:] - input_path[:, :-1]
         # N,T-1,input_size
-        time_len = math.ceil(T / self.truncation)
+        time_len = 1
         out = torch.eye(self.hidden_size, device=input_path.device, dtype=input_path.dtype).reshape(
             1, 1, self.hidden_size, self.hidden_size).repeat(N, self.channels, 1, 1)
 
 
         if self.return_sequence:
             out = []
-            for i in range(0, T, time_len):
-
+            out.append(torch.eye(self.hidden_size, device=input_path.device, dtype=input_path.dtype).reshape(
+                1, 1, 1, self.hidden_size, self.hidden_size).repeat(N, 1, self.channels, 1, 1))
+            for i in range(0, T-1):
+                print(i)
                 dX1 = dX[:, i:i+time_len].reshape(-1, dX.shape[-1])
+                print(dX1.shape)
                 M_dX = self.projection(dX1).reshape(
                     N, -1, self.channels, self.hidden_size, self.hidden_size)
-                out.append(self.prod(M_dX))
+                out.append(torch.einsum('bcdij,bcdjk->bcdik', out[-1], M_dX))
             return torch.cat(out, 1)
         else:
-            for i in range(0, T, time_len):
-
-                dX1 = dX[:, i:i+time_len].reshape(-1, dX.shape[-1])
-                M_dX = self.projection(dX1).reshape(
-                    N, -1, self.channels, self.hidden_size, self.hidden_size)
-                out = torch.einsum('bcij,bcjk->bcik', out,
-                                   self.dyadic_prod(M_dX))
-            return out
-
-
-
-        M_dX = self.projection(input_path).reshape(N, self.channels, self.degree, self.degree)
-
-        return M_dX
+            M_dX = self.projection(dX.reshape(-1, dX.shape[-1])).reshape(
+                N, -1, self.channels, self.hidden_size, self.hidden_size
+            )
+            return self.dyadic_prod(M_dX)
 
     @staticmethod
     def dyadic_prod(X: torch.Tensor) -> torch.Tensor:
-        """compute cumulative product on matrix time series
-            with dyadic partition, should have complexity in O(log(T))
+        """
+        Computes the cumulative product on matrix time series with dyadic partitioning.
 
         Args:
-            X (torch.tensor): A batch of matrix time series, shape (N,T,m,m)
+            X (torch.Tensor): Batch of matrix time series of shape (N, T, C, m, m).
 
         Returns:
-            torch.tensor: cumulative product on time dimension, shape (N,T,m,m)
+            torch.Tensor: Cumulative product on the time dimension of shape (N, T, m, m).
         """
         N, T, C, m, m = X.shape
         max_level = int(torch.ceil(torch.log2(torch.tensor(T))))
-        I = torch.eye(m, device=X.device, dtype=X.dtype).reshape(
-            1, 1, 1, m, m).repeat(N, 1, C, 1, 1)
+        I = (
+            torch.eye(m, device=X.device, dtype=X.dtype)
+            .reshape(1, 1, 1, m, m)
+            .repeat(N, 1, C, 1, 1)
+        )
         for i in range(max_level):
             if X.shape[1] % 2 == 1:
                 X = torch.cat([X, I], 1)
             X = X.reshape(-1, 2, C, m, m)
-            X = torch.einsum('bcij,bcjk->bcik', X[:, 0], X[:, 1])
-            # X = torch.bmm(X[:, 0], X[:, 1])
+            X = torch.einsum("bcij,bcjk->bcik", X[:, 0], X[:, 1])
             X = X.reshape(N, -1, C, m, m)
+
         return X[:, 0]
 
     @staticmethod
     def prod(X):
         M = []
         N, T, C, m, m = X.shape
+        print(X.shape)
         I = torch.eye(m, device=X.device, dtype=X.dtype).reshape(
             1, 1, m, m).repeat(N, C, 1, 1)
         M_X = I

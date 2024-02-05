@@ -4,7 +4,7 @@ from Path_Char.unitary_representation import development_layer
 from Path_Char.utils import AddTime
 
 class char_func_path(nn.Module):
-    def __init__(self, num_samples, hidden_size, input_dim, add_time: bool, init_range: float = 1, include_initial: bool = False):
+    def __init__(self, num_samples, hidden_size, input_dim, add_time: bool, init_range: float = 1, include_initial: bool = False, return_sequence: bool = False):
         """
         Path characteristic function class from paths
         Args:
@@ -25,7 +25,7 @@ class char_func_path(nn.Module):
                                                      hidden_size=self.degree,
                                                      channels=self.num_samples,
                                                      include_initial=include_initial,
-                                                     return_sequence=False,
+                                                     return_sequence=return_sequence,
                                                      init_range=init_range)
 
         for param in self.unitary_development.parameters():
