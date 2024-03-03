@@ -3,6 +3,7 @@ import torch
 from torch import nn
 import math
 from functools import partial
+from src.Tridiagonal_unitary import unitary_diag_projection
 
 def matrix_power_two_batch(A, k):
     orig_size = A.size()
@@ -38,7 +39,6 @@ def rescaled_matrix_exp(f, A):
         0.5, s.float()).unsqueeze_(-1).unsqueeze_(-1).expand_as(A) * A
     # print(A_1.shape)
     return matrix_power_two_batch(f(A_1), s)
-
 
 def unitary_lie_init_(tensor: torch.tensor, init_=None):
     r"""Fills in the input ``tensor`` in place with initialization on the unitary Lie.
@@ -212,14 +212,18 @@ class projection(nn.Module):
 
 
 class development_layer(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, channels: int = 1, include_initial: bool = False,
+    def __init__(self, input_size: int, hidden_size: int, lie_group: str = 'unitary', channels: int = 1, include_initial: bool = False,
                  time_batch=1, return_sequence=False, init_range=1):
         super(development_layer, self).__init__()
         self.input_size = input_size
         self.channels = channels
         self.hidden_size = hidden_size
-        self.projection = projection(
-            input_size, hidden_size, channels, init_range=init_range)
+        if lie_group == 'unitary':
+            self.projection = projection(
+                input_size, hidden_size, channels, init_range=init_range)
+        elif lie_group == 'tridiagonal':
+            self.projection = unitary_diag_projection(
+                input_size, hidden_size, channels, init_range=init_range)
         self.include_initial = include_initial
         self.truncation = time_batch
         self.complex = True

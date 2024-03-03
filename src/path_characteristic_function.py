@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-from Path_Char.unitary_representation import development_layer
-from Path_Char.utils import AddTime
+from src.unitary_representation import development_layer
+from src.utils import AddTime
 
 class char_func_path(nn.Module):
-    def __init__(self, num_samples, hidden_size, input_dim, add_time: bool, init_range: float = 1, include_initial: bool = False, return_sequence: bool = False):
+    def __init__(self, num_samples, hidden_size, input_dim, add_time: bool, lie_group = 'unitary', init_range: float = 1, include_initial: bool = False, return_sequence: bool = False):
         """
         Path characteristic function class from paths
         Args:
@@ -23,6 +23,7 @@ class char_func_path(nn.Module):
             self.input_dim = input_dim + 0
         self.unitary_development = development_layer(input_size=self.input_dim,
                                                      hidden_size=self.degree,
+                                                     lie_group=lie_group,
                                                      channels=self.num_samples,
                                                      include_initial=include_initial,
                                                      return_sequence=return_sequence,
