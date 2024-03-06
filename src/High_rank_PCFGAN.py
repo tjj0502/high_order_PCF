@@ -87,20 +87,20 @@ class HighRankPCFGANTrainer:
             device: Device to perform training on.
             step (int): Current training step.
         """
-        for i in range(self.D_steps_per_G_step):
-            # generate x_fake
-
-            with torch.no_grad():
-                x_real_batch = next(iter(self.train_dl))[0].to(device)
-                x_fake = self.G(
-                    batch_size=self.batch_size,
-                    n_lags=self.config.n_lags,
-                    device=device,
-                )
-
-            D_loss = self.D_trainstep(x_fake, x_real_batch)
-            if i == 0:
-                self.losses_history["D_loss"].append(D_loss)
+        # for i in range(self.D_steps_per_G_step):
+        #     # generate x_fake
+        #
+        with torch.no_grad():
+            x_real_batch = next(iter(self.train_dl))[0].to(device)
+        #         x_fake = self.G(
+        #             batch_size=self.batch_size,
+        #             n_lags=self.config.n_lags,
+        #             device=device,
+        #         )
+        #
+        #     D_loss = self.D_trainstep(x_fake, x_real_batch)
+        #     if i == 0:
+        #         self.losses_history["D_loss"].append(D_loss)
 
         for i in range(self.G_steps_per_D_step):
             G_loss = self.G_trainstep(x_real_batch, device, step, i)
@@ -140,10 +140,20 @@ class HighRankPCFGANTrainer:
         # if self.loss == "both":
         #     G_loss = self.char_func.distance_measure(x_real, x_fake, Lambda=0.1)
 
-        expected_dev_real = self.exp_dev_by_regression(x_real)
-        expected_dev_fake = self.exp_dev_by_regression(x_fake)
+        # On real data, use regression module to compute the expected development
+        exp_dev_real = self.regression_module(AddTime(x_real), self.device)
+        past_dev_real = construct_past_dev_path(self.rank_1_pcf,  AddTime(x_real), x_real.shape[1])
 
-        G_loss = self.D.distance_measure(expected_dev_real, expected_dev_fake, Lambda=0.1)  # (T)
+        # On fake data, do the same
+        exp_dev_fake = self.regression_module(AddTime(x_fake), self.device)
+        past_dev_fake = construct_past_dev_path(self.rank_1_pcf, AddTime(x_fake), x_real.shape[1])
+
+        G_loss = torch.norm(past_dev_real @ exp_dev_real - past_dev_fake@ exp_dev_fake, dim=(2, 3)).mean(0).sum()
+
+        # expected_dev_real = self.exp_dev_by_regression(x_real)
+        # expected_dev_fake = self.exp_dev_by_regression(x_fake)
+        #
+        # G_loss = self.D.distance_measure(expected_dev_real, expected_dev_fake, Lambda=0.1)  # (T)
         # print(G_loss.shape)
         # self.losses_history['G_loss_dyadic'].append(G_loss)
         # G_loss = G_loss.mean()
@@ -152,18 +162,18 @@ class HighRankPCFGANTrainer:
 
         if i == 0:
             grad_norm_G = track_gradient_norms(self.G)
-            grad_norm_D = track_gradient_norms(self.D)
+            # grad_norm_D = track_gradient_norms(self.D)
             norm_G = track_norm(self.G)
-            norm_D = track_norm(self.D)
+            # norm_D = track_norm(self.D)
             self.losses_history['grad_norm_G'].append(grad_norm_G)
-            self.losses_history['grad_norm_D'].append(grad_norm_D)
+            # self.losses_history['grad_norm_D'].append(grad_norm_D)
             self.losses_history['norm_G'].append(norm_G)
-            self.losses_history['norm_D'].append(norm_D)
+            # self.losses_history['norm_D'].append(norm_D)
         torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.config.grad_clip)
         self.G_optimizer.step()
         toggle_grad(self.G, False)
         if step % self.config.evaluate_every == 0 and i==0:
-            self.plot_sample(x_fake, x_real, self.config, step)
+            self.plot_sample(x_real, x_fake, self.config, step)
             # # print(torch.stack(self.losses_history['G_loss_dyadic']).shape)
             # plt.plot(to_numpy(torch.stack(self.losses_history['G_loss_dyadic'])))
             # plt.savefig(
@@ -172,7 +182,7 @@ class HighRankPCFGANTrainer:
             # plt.close()
             self.plot_losses(loss_item="G_loss", step=step)
             self.plot_losses(loss_item="grad_norm_G", step=step)
-            self.plot_losses(loss_item="grad_norm_D", step=step)
+            # self.plot_losses(loss_item="grad_norm_D", step=step)
             # self.plot_losses(loss_item="SigMMD", step=step)
 
         return G_loss.item()
@@ -195,18 +205,22 @@ class HighRankPCFGANTrainer:
         self.D.train()
         self.D_optimizer.zero_grad()
         # print(x_real.shape, x_fake.shape)
-        exp_dev_real = self.exp_dev_by_regression(x_real)
-        exp_dev_fake = self.exp_dev_by_regression(x_fake)
-        # with torch.no_grad():
-        #     # On real data, use regression module to compute the expected development
-        #     exp_dev_real = self.regression_module(x_real, self.device)
-        #     past_dev_real = construct_past_dev_path(self.pcf_rank_1,  AddTime(x_real), x_real.shape[1]+1)
-        #     exp_dev_real = (past_dev_real @ exp_dev_real).reshape([-1, x_real.shape[1], self.config.lie_degree_1 ** 2])
-        #
-        #     # On fake data, do the same
-        #     exp_dev_fake = self.regression_module(x_fake, self.device)
-        #     past_dev_fake = construct_past_dev_path(self.pcf_rank_1, AddTime(x_fake), x_real.shape[1] + 1)
-        #     exp_dev_fake = (past_dev_fake @ exp_dev_real).reshape([-1, x_real.shape[1], self.config.lie_degree_1 ** 2])
+        # exp_dev_real = self.exp_dev_by_regression(x_real)
+        # exp_dev_fake = self.exp_dev_by_regression(x_fake)
+
+        # On real data, use regression module to compute the expected development
+        exp_dev_real = self.regression_module(AddTime(x_real), self.device)
+        past_dev_real = construct_past_dev_path(self.pcf_rank_1,  AddTime(x_real), x_real.shape[1]+1)
+
+        # On fake data, do the same
+        exp_dev_fake = self.regression_module(AddTime(x_fake), self.device)
+        past_dev_fake = construct_past_dev_path(self.pcf_rank_1, AddTime(x_fake), x_real.shape[1] + 1)
+
+
+
+        # exp_dev_real = (past_dev_real @ exp_dev_real).reshape([-1, x_real.shape[1], self.config.lie_degree_1 ** 2])
+        # exp_dev_fake = (past_dev_fake @ exp_dev_real).reshape([-1, x_real.shape[1], self.config.lie_degree_1 ** 2])
+
         d_loss = -self.D.distance_measure(exp_dev_real, exp_dev_fake, Lambda=0.1)
 
         d_loss.backward()
