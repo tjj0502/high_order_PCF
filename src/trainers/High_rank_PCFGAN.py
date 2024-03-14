@@ -1,7 +1,7 @@
 import torch
 from tqdm import tqdm
 from src.utils import AddTime, to_numpy, track_gradient_norms, track_norm, construct_past_dev_path
-from src.path_characteristic_function import char_func_path
+from src.model.discriminator.path_characteristic_function import pcf
 import torch.optim.swa_utils as swa_utils
 import matplotlib.pyplot as plt
 from os import path as pt
@@ -39,12 +39,11 @@ class HighRankPCFGANTrainer:
 
         self.rank_1_pcf = rank_1_pcf
         self.regression_module = regression_module
-        self.D = char_func_path(num_samples=config.Rank_2_num_samples,
-                                         hidden_size=config.Rank_2_lie_degree,
-                                         input_dim=2 * config.Rank_1_lie_degree ** 2,
-                                         add_time=self.add_time,
-                                         include_initial=False,
-                                         return_sequence=False)
+        self.D = pcf(num_samples=config.Rank_2_num_samples,
+                     hidden_size=config.Rank_2_lie_degree,
+                     input_dim=2 * config.Rank_1_lie_degree ** 2,
+                     add_time=self.add_time,
+                     include_initial=False)
 
         self.D_optimizer = torch.optim.Adam(
             self.D.parameters(), lr=config.lr_D, betas=(0, 0.9)

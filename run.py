@@ -1,14 +1,14 @@
 import os
 
 from os import path as pt
-import argparse
 from src.utils import get_experiment_dir, save_obj, load_config
 import torch
 from torch import nn
 import matplotlib
-from src.path_characteristic_function import char_func_path
+from src.model.discriminator.path_characteristic_function import pcf
 from src.datasets.data_preparation import prepare_dl
-from src.model import LSTMRegressor, LSTMGenerator
+from src.model import LSTMGenerator
+from src.model.regressor.regressor import LSTMRegressor
 from src.train_regressor import train_regressor, plot_reg_losses
 
 def main(config):
@@ -47,12 +47,12 @@ def main(config):
     config.data_feat_dim = fbm_h.shape[-1]
     config.n_lags = fbm_h.shape[1]
 
-    rank_1_pcf = char_func_path(num_samples=config.Rank_1_num_samples,
-                               hidden_size=config.Rank_1_lie_degree,
-                               input_dim=fbm_h.shape[-1],
-                               add_time=True,
-                               include_initial=False,
-                               return_sequence=False).to(config.device)
+    rank_1_pcf = pcf(num_samples=config.Rank_1_num_samples,
+                     hidden_size=config.Rank_1_lie_degree,
+                     input_dim=fbm_h.shape[-1],
+                     add_time=True,
+                     include_initial=False,
+                     return_sequence=False).to(config.device)
 
     train_reg_X_dl, test_reg_X_dl, train_pcf_X_dl, test_pcf_X_dl = prepare_dl(config, rank_1_pcf, fbm_h, fbm_h_test)
 
@@ -74,7 +74,7 @@ def main(config):
     plot_reg_losses(test_loss, config, 'test')
 
 
-    from src.High_rank_PCFGAN import HighRankPCFGANTrainer
+    from src.trainers.High_rank_PCFGAN import HighRankPCFGANTrainer
     generator = LSTMGenerator(input_dim=config.G_input_dim,
                               hidden_dim=config.G_hidden_dim,
                               output_dim=config.data_feat_dim,
