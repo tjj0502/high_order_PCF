@@ -68,23 +68,42 @@ def to_numpy(x):
     return x.detach().cpu().numpy()
 
 
-def construct_future_dev_path(pcf, path, steps):
+def construct_future_dev_path(pcf, path):
+    """
+    Construct the future development path
+    Input:
+    pcf: Rank 1 pcf layer
+    path: tensor of shape [N, T, d]
+    Output:
+    development path of shape [N, m, T, lie, lie]
+    """
     with torch.no_grad():
         lie_degree = pcf.degree
+        num_samples = pcf.num_samples
         N, T, D = path.shape
+        steps = T
         dev_list = []
         for step in range(steps):
             if step == steps-1:
-                dev = torch.eye(lie_degree).repeat(N, 1, 1, 1).to(dtype=dev_list[0].dtype, device=dev_list[0].device)
+                dev = torch.eye(lie_degree).repeat(N, num_samples, 1, 1).to(dtype=dev_list[0].dtype, device=dev_list[0].device)
                 dev_list.append(dev)
             else:
                 dev_list.append(pcf.unitary_development(path[:, step:]))
-    return torch.cat(dev_list, dim = 1)
+    return torch.stack(dev_list).permute([1,2,0,3,4]).squeeze()
 
-def construct_past_dev_path(pcf, path, steps):
+def construct_past_dev_path(pcf, path):
+    """
+    Construct the past development path
+    Input:
+    pcf: Rank 1 pcf layer
+    path: tensor of shape [N, T, d]
+    Output:
+    development path of shape [N, m, T, lie, lie]
+    """
     with torch.no_grad():
         lie_degree = pcf.degree
         N, T, D = path.shape
+        steps = T
         dev_list = []
         for step in range(1, steps+1):
             if step == 1:
@@ -93,7 +112,7 @@ def construct_past_dev_path(pcf, path, steps):
             else:
                 dev_list.append(pcf.unitary_development(path[:, :step]))
         dev_list[0] = dev_list[0].to(dtype=dev_list[-1].dtype, device=dev_list[-1].device)
-    return torch.cat(dev_list, dim = 1)
+    return torch.stack(dev_list).permute([1,2,0,3,4]).squeeze()
 
 def get_experiment_dir(config):
     exp_dir = './numerical_results/{dataset}/algo_{gan}_G_{generator}_D_lie_degree_{liedeg}_n_lag_{n_lags}_{seed}_comment_{comment}_{lie_group}'.format(
@@ -165,3 +184,19 @@ def load_config(file_dir: str):
     with open(file_dir) as file:
         config = ml_collections.ConfigDict(yaml.safe_load(file))
     return config
+
+def track_gradient_norms(model):
+    total_norm = 0
+    for p in model.parameters():
+        param_norm = p.grad.data.norm(2)
+        total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+    return total_norm
+
+def track_norm(model):
+    total_norm = 0
+    for p in model.parameters():
+        param_norm = p.data.norm(2)
+        total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+    return total_norm

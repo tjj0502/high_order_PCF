@@ -34,11 +34,12 @@ class development_layer(nn.Module):
             self.projection = unitary_projection(
                 input_size, hidden_size, channels, init_range=init_range
             )
-            self.complex = True
+
         elif lie_group == 'unitary_tridiag':
             self.projection = unitary_tridiag_projection(input_size, hidden_size, channels, init_range)
         else:
             raise ValueError("Please provide a valid lie group.")
+        self.complex = True
         self.include_initial = include_initial
         self.partition_size = partition_size
 

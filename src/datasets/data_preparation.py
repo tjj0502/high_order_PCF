@@ -41,10 +41,10 @@ def prepare_dl(config, rank_1_pcf, X_train, X_test, h=None, add_time = True):
 
     print(steps)
     with torch.no_grad():
-        future_dev_path_X = construct_future_dev_path(rank_1_pcf, X_train, steps)
-        future_dev_path_X_test = construct_future_dev_path(rank_1_pcf, X_test, steps)
-        past_dev_path_X = construct_past_dev_path(rank_1_pcf, X_train, steps)
-        past_dev_path_X_test = construct_past_dev_path(rank_1_pcf, X_test, steps)
+        future_dev_path_X = construct_future_dev_path(rank_1_pcf, X_train)
+        future_dev_path_X_test = construct_future_dev_path(rank_1_pcf, X_test)
+        past_dev_path_X = construct_past_dev_path(rank_1_pcf, X_train)
+        past_dev_path_X_test = construct_past_dev_path(rank_1_pcf, X_test)
 
     if h:
         X_train = torch.cat([X_train,

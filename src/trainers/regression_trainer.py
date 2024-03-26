@@ -71,7 +71,7 @@ class regressor_joint_trainer(regressor_trainer):
         self.regressor_Y.to(self.device)
         best_loss_X = 10000.
         best_loss_Y = 10000.
-        loss = {"R1_loss": [], "R2_loss": [], "R1X_R2X": [], "R1Y_R2Y": [], "Test_R1_loss": [], "Test_R2_loss": []}
+        loss = {"R1_loss": [], "R2_loss": [], "R1X_R2X": [], "R1Y_R2Y": [], "R1X_R1Y": [], "R2X_R2Y": [], "Test_R1_loss": [], "Test_R2_loss": []}
         regressor_optimizer_X = torch.optim.Adam(self.regressor_X.parameters(), betas=(0, 0.9), lr=self.config.lr_R)
         regressor_optimizer_Y = torch.optim.Adam(self.regressor_Y.parameters(), betas=(0, 0.9), lr=self.config.lr_R)
         self.regressor_X.train()
@@ -116,6 +116,13 @@ class regressor_joint_trainer(regressor_trainer):
 
                 loss["R1X_R2X"].append(regressor_loss_YX.item())
                 loss["R1Y_R2Y"].append(regressor_loss_XY.item())
+
+
+                regressor_loss_XXY = torch.norm(reg_dev_X - reg_dev_XY, dim=[2, 3]).sum(1).mean()
+                regressor_loss_YYX = torch.norm(reg_dev_Y - reg_dev_YX, dim=[2, 3]).sum(1).mean()
+
+                loss["R1X_R1Y"].append(regressor_loss_XXY.item())
+                loss["R2X_R2Y"].append(regressor_loss_YYX.item())
 
             if i % 50 == 0:
                 with torch.no_grad():

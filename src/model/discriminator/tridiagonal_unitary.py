@@ -71,6 +71,12 @@ class unitary_tridiag_projection(base_projection):
             init_range (int, optional): Range for weight initialization. Defaults to 1.
         """
         super(unitary_tridiag_projection, self).__init__(input_size, hidden_size, channels, init_range, **kwargs)
+
+        A = torch.empty(
+            input_size, channels, hidden_size - 1, dtype=torch.cfloat
+        )
+        self.A = nn.Parameter(A)
+        self.reset_parameters()
         self.param_map = unitary_tridiag()
 
     def reset_parameters(self):
